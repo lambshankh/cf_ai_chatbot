@@ -1,8 +1,8 @@
 import { getMemory } from "./memory";
 
-// -------------------------------------------
+// ------------------------------------------------------
 // Handle chat
-// -------------------------------------------
+// ------------------------------------------------------
 export async function handleChat(req: Request, env: Env, sessionId: string) {
   const body = await req.json() as { message?: string };
   const userMessage = body.message?.trim();
@@ -14,7 +14,6 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
     });
   }
 
-  // Durable Object session instance
   const id = env.SESSIONS.idFromName(sessionId);
   const stub = env.SESSIONS.get(id);
 
@@ -26,31 +25,31 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
       history: Array<{ role: string; content: string }>;
     };
 
-  // Build prompt
+  // Build LLM prompt
   const contextMsgs: Array<{ role: string; content: string }> = [];
 
-  // SYSTEM BEHAVIOUR
+  // SYSTEM — natural, human tone, uses memory
   contextMsgs.push({
     role: "system",
     content:
-      "You are a direct assistant. No fluff. No invented facts.\n" +
-      "You MUST treat the MEMORY block as ground truth.\n" +
-      "If asked about stored facts, answer strictly from MEMORY.\n" +
-      "For all other questions, use full conversation context."
+      "You are a natural, human-sounding assistant. " +
+      "You remember stable facts the user tells you in this session. " +
+      "These facts are provided below. " +
+      "You never mention the word 'memory' to the user."
   });
 
-  // Inject stored JSON memory
+  // Provide memory to model (hidden from user)
   contextMsgs.push({
     role: "assistant",
     content: `MEMORY:\n${JSON.stringify(memory)}`
   });
 
-  // Insert conversation history
+  // Add entire conversation history
   for (const entry of history) {
     contextMsgs.push({ role: entry.role, content: entry.content });
   }
 
-  // Insert new user message
+  // Add new user message
   contextMsgs.push({ role: "user", content: userMessage });
 
   // Debug
@@ -67,7 +66,7 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
 
   const reply = result.response ?? "";
 
-  // Save new turns to history
+  // Store the turns
   const addUserResp = await stub.fetch("http://session/add", {
     method: "POST",
     body: JSON.stringify({ entry: { role: "user", content: userMessage } })
@@ -78,10 +77,10 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
     body: JSON.stringify({ entry: { role: "assistant", content: reply } })
   });
 
-  // Decide whether to update memory
+  // Memory update trigger
   const needUpdate =
-    (await addUserResp.text()) === "NEED_SUMMARY" ||
-    (await addBotResp.text()) === "NEED_SUMMARY";
+    (await addUserResp.text()) === "NEED_MEMORY_UPDATE" ||
+    (await addBotResp.text()) === "NEED_MEMORY_UPDATE";
 
   if (needUpdate) {
     await updateMemory(env, stub);
@@ -93,9 +92,10 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
 }
 
 
-// -------------------------------------------
-// MEMORY UPDATE (JSON PATCH)
-// -------------------------------------------
+
+// ------------------------------------------------------
+// Memory update logic (improved)
+// ------------------------------------------------------
 async function updateMemory(env: Env, stub: DurableObjectStub) {
   const sessionData = await stub.fetch("http://session/get");
   const { memory, history } =
@@ -104,28 +104,34 @@ async function updateMemory(env: Env, stub: DurableObjectStub) {
       history: Array<{ role: string; content: string }>;
     };
 
-  const prompt = `
-You update a memory JSON object for the user.
+  // Only use the last 4 messages for memory updates
+  const recent = history.slice(-4);
 
-RULES:
-- Modify a field ONLY if the user explicitly states a new fact.
-- Do NOT remove fields unless the user directly contradicts them.
-- User questions, confusion, or uncertainty DO NOT change memory.
-- Add new fields ONLY for clear factual statements.
-- Output MUST be valid JSON only. No explanation.
+  const prompt = `
+Update the JSON MEMORY using only long-term, user-stated facts.
+
+STRICT RULES:
+- Only save information the user clearly states about themselves that would matter long term.
+- Ignore code, debugging, meta-discussion, instructions, prompts, or anything about the assistant.
+- Ignore temporary info, opinions, jokes, one-off comments.
+- Ignore anything not explicitly about the user.
+- Do NOT save low-value details like mood or temporary plans.
+- If the user contradicts an existing fact, keep the newest explicit statement.
+- If no stable facts were stated, return the JSON unchanged.
+- Output ONLY valid JSON. No comments.
 
 Current memory:
 ${JSON.stringify(memory, null, 2)}
 
 Recent messages:
-${history.map(h => `${h.role}: ${h.content}`).join("\n")}
+${recent.map(m => `${m.role}: ${m.content}`).join("\n")}
 `;
 
   const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
     messages: [
       {
         role: "system",
-        content: "You update memory. Output only valid JSON."
+        content: "Update the MEMORY JSON. Output JSON only."
       },
       { role: "user", content: prompt }
     ]
@@ -135,11 +141,9 @@ ${history.map(h => `${h.role}: ${h.content}`).join("\n")}
   try {
     newMemory = JSON.parse(result.response);
   } catch {
-    // Safety fallback
     newMemory = memory;
   }
 
-  // Save new JSON memory to DO
   await stub.fetch("http://session/save-memory", {
     method: "POST",
     body: JSON.stringify({ memory: newMemory })
