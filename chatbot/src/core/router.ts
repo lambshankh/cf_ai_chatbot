@@ -6,8 +6,12 @@ const router = {
     const url = new URL(req.url);
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
-      return handleChat(req, env);
+    const sessionId =
+        url.searchParams.get("session") || crypto.randomUUID();
+
+    return handleChat(req, env, sessionId);
     }
+
 
     return serveStatic(req);
   },

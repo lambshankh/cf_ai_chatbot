@@ -1,7 +1,6 @@
 import { embedText } from "./embed";
-import { findClosest, getCacheHit, storeCacheHit } from "./cache";
 
-export async function handleChat(req: Request, env: Env) {
+export async function handleChat(req: Request, env: Env, sessionId: string) {
   const body = await req.json() as { message?: string };
   const userMessage = body.message?.trim();
 
@@ -12,39 +11,42 @@ export async function handleChat(req: Request, env: Env) {
     });
   }
 
-  // Step 1: embed the question
-  const v = await embedText(env, userMessage);
+  // Durable Object session
+  const id = env.SESSIONS.idFromName(sessionId);
+  const stub = env.SESSIONS.get(id);
 
-  // Step 2: check semantic cache
-  const cacheKey = await findClosest(env, v, 0.9);
-  if (cacheKey) {
-    const cached = await getCacheHit(env, cacheKey);
-    if (cached) {
-      return new Response(
-        JSON.stringify({ reply: cached.answer, from_cache: true }),
-        { headers: { "content-type": "application/json" } }
-      );
-    }
-  }
+  // Load conversation history
+  const historyResp = await stub.fetch("http://session/get");
+  const history =
+    await historyResp.json() as Array<{ role: string; content: string }>;
 
-  // Step 3: LLM call
-    const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
-    messages: [
-      { role: "system", content: "You are a concise, helpful assistant." },
-      { role: "user", content: userMessage }
-    ]
+  // Build context window
+  const contextMsgs = history.map(h => ({
+    role: h.role,
+    content: h.content
+  }));
+  contextMsgs.push({ role: "user", content: userMessage });
+
+  // LLM call with full context
+  const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+    messages: contextMsgs
   });
 
   const reply = result.response ?? "";
-  console.log("LLM raw result:", result);
 
+  // Store both user and assistant messages in the session history
+  await stub.fetch("http://session/add", {
+    method: "POST",
+    body: JSON.stringify({
+      entry: { role: "user", content: userMessage }
+    })
+  });
 
-  // Step 4: store in cache
-  const key = crypto.randomUUID();
-  await storeCacheHit(env, key, {
-    input: userMessage,
-    embedding: v,
-    answer: reply
+  await stub.fetch("http://session/add", {
+    method: "POST",
+    body: JSON.stringify({
+      entry: { role: "assistant", content: reply }
+    })
   });
 
   return new Response(JSON.stringify({ reply }), {
