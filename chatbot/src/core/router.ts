@@ -44,8 +44,8 @@ const router = {
     // existing chat route stays above or below this
 
     if (url.pathname === "/api/chat" && req.method === "POST") {
-      const sessionId =
-        url.searchParams.get("session") || crypto.randomUUID();
+      console.log("HIT /api/chat");
+      const sessionId = url.searchParams.get("session") || "default";
 
       return handleChat(req, env, sessionId);
     }

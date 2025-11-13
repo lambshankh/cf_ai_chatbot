@@ -1,5 +1,8 @@
 import { getMemory } from "./memory";
 
+// -------------------------------------------
+// Handle chat
+// -------------------------------------------
 export async function handleChat(req: Request, env: Env, sessionId: string) {
   const body = await req.json() as { message?: string };
   const userMessage = body.message?.trim();
@@ -11,50 +14,51 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
     });
   }
 
-  // Durable Object session
+  // Durable Object session instance
   const id = env.SESSIONS.idFromName(sessionId);
   const stub = env.SESSIONS.get(id);
 
-  // Load summary + history
+  // Load memory + history
   const sessionDataResp = await stub.fetch("http://session/get");
-  const { summary, history } = await sessionDataResp.json() as {
-    summary: string;
-    history: Array<{ role: string; content: string }>;
-  };
+  const { memory, history } =
+    await sessionDataResp.json() as {
+      memory: Record<string, any>;
+      history: Array<{ role: string; content: string }>;
+    };
 
-  // Load long-term KV memory
-  const longTerm = await getMemory(env);
-
-  const memoryBlock =
-    longTerm.length > 0
-      ? [{
-          role: "system",
-          content:
-            "Persistent user memory:\n" +
-            longTerm.map(m => `- ${m.key}: ${m.value}`).join("\n")
-        }]
-      : [];
-
+  // Build prompt
   const contextMsgs: Array<{ role: string; content: string }> = [];
 
-  // 1. LTM
-  contextMsgs.push(...memoryBlock);
+  // SYSTEM BEHAVIOUR
+  contextMsgs.push({
+    role: "system",
+    content:
+      "You are a direct assistant. No fluff. No invented facts.\n" +
+      "You MUST treat the MEMORY block as ground truth.\n" +
+      "If asked about stored facts, answer strictly from MEMORY.\n" +
+      "For all other questions, use full conversation context."
+  });
 
-  // 2. Session summary
-  if (summary && summary.length > 0) {
-    contextMsgs.push({
-      role: "system",
-      content: "Conversation summary:\n" + summary
-    });
-  }
+  // Inject stored JSON memory
+  contextMsgs.push({
+    role: "assistant",
+    content: `MEMORY:\n${JSON.stringify(memory)}`
+  });
 
-  // 3. Last window history
+  // Insert conversation history
   for (const entry of history) {
     contextMsgs.push({ role: entry.role, content: entry.content });
   }
 
-  // 4. New user message
+  // Insert new user message
   contextMsgs.push({ role: "user", content: userMessage });
+
+  // Debug
+  console.log(">>> PROMPT START >>>");
+  contextMsgs.forEach((m, i) =>
+    console.log(`[${i}] ${m.role.toUpperCase()}: ${m.content}`)
+  );
+  console.log("<<< PROMPT END <<<");
 
   // LLM call
   const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
@@ -63,81 +67,81 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
 
   const reply = result.response ?? "";
 
-  // --------------------------
-  // Store user + assistant turns
-  // --------------------------
-
+  // Save new turns to history
   const addUserResp = await stub.fetch("http://session/add", {
     method: "POST",
-    body: JSON.stringify({
-      entry: { role: "user", content: userMessage }
-    })
+    body: JSON.stringify({ entry: { role: "user", content: userMessage } })
   });
 
   const addBotResp = await stub.fetch("http://session/add", {
     method: "POST",
-    body: JSON.stringify({
-      entry: { role: "assistant", content: reply }
-    })
+    body: JSON.stringify({ entry: { role: "assistant", content: reply } })
   });
 
-  // --------------------------
-  // Check for summarisation trigger
-  // --------------------------
-
-  const needSummary =
+  // Decide whether to update memory
+  const needUpdate =
     (await addUserResp.text()) === "NEED_SUMMARY" ||
     (await addBotResp.text()) === "NEED_SUMMARY";
 
-  if (needSummary) {
-    await summariseSession(env, stub);
+  if (needUpdate) {
+    await updateMemory(env, stub);
   }
 
-  // Return reply
   return new Response(JSON.stringify({ reply }), {
     headers: { "content-type": "application/json" }
   });
 }
 
-// ----------------------
-// Summarisation helper
-// ----------------------
 
-async function summariseSession(env: Env, stub: DurableObjectStub) {
+// -------------------------------------------
+// MEMORY UPDATE (JSON PATCH)
+// -------------------------------------------
+async function updateMemory(env: Env, stub: DurableObjectStub) {
   const sessionData = await stub.fetch("http://session/get");
-  const { summary, history } =
+  const { memory, history } =
     await sessionData.json() as {
-      summary: string;
-      history: Array<{ role: string; content: string }>
+      memory: Record<string, any>;
+      history: Array<{ role: string; content: string }>;
     };
 
   const prompt = `
-Summarise the following conversation into a concise long-term memory.
-Preserve only:
-- user facts
-- preferences
-- goals/tasks
-- ongoing context
-- anything important long-term
+You update a memory JSON object for the user.
 
-Previous summary:
-${summary}
+RULES:
+- Modify a field ONLY if the user explicitly states a new fact.
+- Do NOT remove fields unless the user directly contradicts them.
+- User questions, confusion, or uncertainty DO NOT change memory.
+- Add new fields ONLY for clear factual statements.
+- Output MUST be valid JSON only. No explanation.
 
-New messages:
+Current memory:
+${JSON.stringify(memory, null, 2)}
+
+Recent messages:
 ${history.map(h => `${h.role}: ${h.content}`).join("\n")}
 `;
 
   const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
     messages: [
-      { role: "system", content: "Summarise into compact memory. Output plain text only." },
+      {
+        role: "system",
+        content: "You update memory. Output only valid JSON."
+      },
       { role: "user", content: prompt }
     ]
   });
 
-  const newSummary = result.response ?? summary;
+  let newMemory: Record<string, any>;
+  try {
+    newMemory = JSON.parse(result.response);
+  } catch {
+    // Safety fallback
+    newMemory = memory;
+  }
 
-  await stub.fetch("http://session/save-summary", {
+  // Save new JSON memory to DO
+  await stub.fetch("http://session/save-memory", {
     method: "POST",
-    body: JSON.stringify({ summary: newSummary })
+    body: JSON.stringify({ memory: newMemory })
   });
 }
