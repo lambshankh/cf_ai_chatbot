@@ -1,5 +1,3 @@
-// src/core/embed.ts
-
 export async function embedText(env: Env, text: string): Promise<number[]> {
   const result = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
     text
