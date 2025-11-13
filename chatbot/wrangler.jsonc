@@ -20,12 +20,12 @@
     ]
   },
 
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_classes": ["SessionDO"]
-    }
-  ],
+"migrations": [
+  {
+    "tag": "v1",
+    "new_classes": ["SessionDO"]
+  }
+],
 
   "observability": { "enabled": true }
 }

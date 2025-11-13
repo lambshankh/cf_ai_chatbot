@@ -10,20 +10,39 @@ export class SessionDO {
     const method = req.method;
 
     if (url.pathname === "/get") {
+      const summary = (await this.state.storage.get("summary")) || "";
       const history = (await this.state.storage.get("history")) || [];
-      return new Response(JSON.stringify(history), {
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({ summary, history }),
+        { headers: { "content-type": "application/json" } }
+      );
     }
 
     if (url.pathname === "/add" && method === "POST") {
-      const body = await req.json();
-      const entry = body?.entry;
-      if (!entry) return new Response("Missing entry", { status: 400 });
+        const body = await req.json() as { entry?: { role: string; content: string } };
+        const entry = body.entry;
+        if (!entry) return new Response("Missing entry", { status: 400 });
 
-      const history = (await this.state.storage.get("history")) || [];
-      history.push(entry);
-      await this.state.storage.put("history", history);
+        const MAX_WINDOW = 5;
+
+        const history = await this.state.storage.get<Array<{ role: string; content: string }>>("history") || [];
+        history.push(entry);
+
+        if (history.length > MAX_WINDOW) {
+            await this.state.storage.put("history", history);
+            return new Response("NEED_SUMMARY");
+        }
+
+        await this.state.storage.put("history", history);
+        return new Response("OK");
+    }
+
+
+    if (url.pathname === "/save-summary" && method === "POST") {
+      const body = await req.json() as { summary?: string };
+
+      await this.state.storage.put("summary", body.summary || "");
+      await this.state.storage.put("history", []);
 
       return new Response("OK");
     }
