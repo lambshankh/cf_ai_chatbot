@@ -173,8 +173,3 @@ The app is engineered to stay well within free-tier constraints while still demo
 
 ---
 
-## PROMPTS
-
-See **PROMPTS.md** for full system prompts and memory-update prompts used during development.
-
----
