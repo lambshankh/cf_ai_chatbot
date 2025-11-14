@@ -38,6 +38,25 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
       "You never mention the word 'memory' to the user."
   });
 
+  // User controlled memory
+  const kvList = await env.MEMORY.list();
+  const userFacts = await Promise.all(
+    kvList.keys.map(async (k) => ({
+      key: k.name,
+      value: await env.MEMORY.get(k.name)
+    }))
+  );
+
+  contextMsgs.push({
+    role: "assistant",
+    content:
+      "USER_FACTS:\n" +
+      (userFacts.length
+        ? userFacts.map(f => `- ${f.key}: ${f.value}`).join("\n")
+        : "None")
+  });
+  // ------------------------------------------------------
+
   // Provide memory to model (hidden from user)
   contextMsgs.push({
     role: "assistant",

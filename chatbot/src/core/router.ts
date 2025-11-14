@@ -1,43 +1,39 @@
 import { handleChat } from "./ai";
-import { getMemory, addMemory, updateMemory, deleteMemory } from "./memory";
 import { serveStatic } from "./static";
 
 const router = {
   async handle(req: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(req.url);
-
-    // memory endpoints
-    if (url.pathname === "/api/memory" && req.method === "GET") {
-      const mem = await getMemory(env);
-      return new Response(JSON.stringify(mem), {
+    
+    // ------------------------------------------------------
+    // User-controlled FACTS (KV)
+    // ------------------------------------------------------
+    if (url.pathname === "/api/facts" && req.method === "GET") {
+      const list = await env.MEMORY.list();
+      const items = await Promise.all(
+        list.keys.map(async (k) => ({
+          key: k.name,
+          value: await env.MEMORY.get(k.name)
+        }))
+      );
+      return new Response(JSON.stringify(items), {
         headers: { "content-type": "application/json" }
       });
     }
 
-    if (url.pathname === "/api/memory/add" && req.method === "POST") {
-      const body = await req.json() as { key?: string; value?: string };
-      if (!body.key || !body.value) {
-        return new Response("Missing key or value", { status: 400 });
-      }
-      await addMemory(env, body.key, body.value);
+    if (url.pathname === "/api/facts/add" && req.method === "POST") {
+      const body = await req.json();
+      if (!body.key || !body.value) return new Response("Missing", { status: 400 });
+
+      await env.MEMORY.put(body.key, body.value);
       return new Response("OK");
     }
 
-    if (url.pathname === "/api/memory/update" && req.method === "POST") {
-      const body = await req.json() as { key?: string; value?: string };
-      if (!body.key || !body.value) {
-        return new Response("Missing key or value", { status: 400 });
-      }
-      await updateMemory(env, body.key, body.value);
-      return new Response("OK");
-    }
+    if (url.pathname === "/api/facts/delete" && req.method === "POST") {
+      const body = await req.json();
+      if (!body.key) return new Response("Missing key", { status: 400 });
 
-    if (url.pathname === "/api/memory/delete" && req.method === "POST") {
-      const body = await req.json() as { key?: string };
-      if (!body.key) {
-        return new Response("Missing key", { status: 400 });
-      }
-      await deleteMemory(env, body.key);
+      await env.MEMORY.delete(body.key);
       return new Response("OK");
     }
 

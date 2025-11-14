@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { MemoryPanel } from "./components/MemoryPanel";
 import { ChatBubble } from "./components/ChatBubble";
 
 function App() {
@@ -15,22 +16,6 @@ function App() {
 
     const userMsg = { role: "user", content: text };
     setMessages(prev => [...prev, userMsg]);
-
-    // /memory command
-    if (text === "/memory") {
-      const res = await fetch("/api/memory?session=default");
-      const data = await res.json();
-      const reply =
-        "Summary:\n" +
-        (data.summary || "No summary yet.") +
-        "\n\nPersistent memory:\n" +
-        (data.persistent_memory.length
-          ? data.persistent_memory.map((m: any) => `${m.key}: ${m.value}`).join("\n")
-          : "None");
-
-      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
-      return;
-    }
 
     const res = await fetch("/api/chat?session=default", {
       method: "POST",
@@ -54,85 +39,94 @@ function App() {
       style={{
         height: "100vh",
         width: "100vw",
+        background: "#101010",
         display: "flex",
         justifyContent: "center",
-        alignItems: "center",
-        background: "#101010"
+        alignItems: "center"
       }}
     >
       <div
         style={{
-          padding: 20,
-          maxWidth: 600,
-          width: "90%",
-          background: "#1b1b1b",
-          borderRadius: 12,
-          boxShadow: "0 0 35px rgba(0,0,0,0.7)",
-          height: "85vh",
           display: "flex",
-          flexDirection: "column",
-          border: "1px solid #2c2c2c"
+          flexDirection: "row",
+          gap: 20,
+          height: "85vh",
+          width: "95%",
+          maxWidth: 1000
         }}
       >
-        <h2
-          style={{
-            textAlign: "center",
-            marginBottom: 10,
-            color: "#f2f2f2"
-          }}
-        >
-          CF AI Chatbot
-        </h2>
-
+        {/* LEFT: chat */}
         <div
-          ref={chatRef}
           style={{
             flex: 1,
-            overflowY: "auto",
+            background: "#1a1a1a",
+            borderRadius: 12,
+            padding: 20,
+            color: "white",
             border: "1px solid #2c2c2c",
-            padding: 12,
-            borderRadius: 8,
-            background: "#171717"
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 0 12px rgba(0,0,0,0.35)"
           }}
         >
-          {messages.map((m, i) => (
-            <ChatBubble key={i} role={m.role as any} content={m.content} />
-          ))}
-        </div>
+          <h2 style={{ textAlign: "center", marginBottom: 10, fontWeight: 600 }}>
+            CF AI Chatbot
+          </h2>
 
-        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+          <div
+            ref={chatRef}
             style={{
               flex: 1,
-              padding: "10px",
-              borderRadius: 6,
+              overflowY: "auto",
               border: "1px solid #2c2c2c",
-              fontSize: "16px",
-              background: "#222",
-              color: "#fff"
-            }}
-          />
-          <button
-            onClick={sendMessage}
-            style={{
-              padding: "10px 18px",
-              borderRadius: 6,
-              background: "#0078FF",
-              border: "none",
-              color: "white",
-              cursor: "pointer"
+              background: "#171717",
+              padding: "14px 12px",
+              borderRadius: 10
             }}
           >
-            Send
-          </button>
+            {messages.map((m, i) => (
+              <ChatBubble key={i} role={m.role as any} content={m.content} />
+            ))}
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              style={{
+                flex: 1,
+                padding: 12,
+                borderRadius: 6,
+                background: "#222",
+                color: "white",
+                border: "1px solid #444",
+                fontSize: 15
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              style={{
+                padding: "12px 20px",
+                borderRadius: 6,
+                background: "#007bff",
+                border: "none",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: 600,
+                boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
+              }}
+            >
+              Send
+            </button>
+          </div>
         </div>
+
+        {/* RIGHT: memory panel */}
+        <MemoryPanel />
       </div>
     </div>
   );
-
 }
 
 export default App;
