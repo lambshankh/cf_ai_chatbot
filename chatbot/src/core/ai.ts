@@ -1,5 +1,3 @@
-import { getMemory } from "./memory";
-
 // ------------------------------------------------------
 // Handle chat
 // ------------------------------------------------------
@@ -158,7 +156,8 @@ ${recent.map(m => `${m.role}: ${m.content}`).join("\n")}
 
   let newMemory: Record<string, any>;
   try {
-    newMemory = JSON.parse(result.response);
+    const raw = result.response ?? "";
+    newMemory = JSON.parse(raw);
   } catch {
     newMemory = memory;
   }

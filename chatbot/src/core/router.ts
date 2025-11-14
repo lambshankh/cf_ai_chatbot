@@ -22,7 +22,7 @@ const router = {
     }
 
     if (url.pathname === "/api/facts/add" && req.method === "POST") {
-      const body = await req.json();
+      const body: { key?: string; value?: string } = await req.json();
       if (!body.key || !body.value) return new Response("Missing", { status: 400 });
 
       await env.MEMORY.put(body.key, body.value);
@@ -30,7 +30,7 @@ const router = {
     }
 
     if (url.pathname === "/api/facts/delete" && req.method === "POST") {
-      const body = await req.json();
+      const body: { key?: string; value?: string } = await req.json();
       if (!body.key) return new Response("Missing key", { status: 400 });
 
       await env.MEMORY.delete(body.key);
