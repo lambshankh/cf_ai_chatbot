@@ -6,8 +6,15 @@ export function MemoryPanel() {
   const [newValue, setNewValue] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
 
+  // --- FIXED: correct backend base URL ---
+  const API_BASE = import.meta.env.DEV
+    ? "/api"
+    : "https://chatbot.shankhisinha1005.workers.dev/api";
+
   async function loadFacts() {
-    const res = await fetch("/api/facts");
+    const res = await fetch(`${API_BASE}/facts`, {
+      headers: { "Content-Type": "application/json" }
+    });
     const data = await res.json();
     setFacts(data);
   }
@@ -15,8 +22,9 @@ export function MemoryPanel() {
   async function addFact() {
     if (!newKey.trim() || !newValue.trim()) return;
 
-    await fetch("/api/facts/add", {
+    await fetch(`${API_BASE}/facts/add`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         key: newKey.trim(),
         value: newValue.trim()
@@ -29,8 +37,9 @@ export function MemoryPanel() {
   }
 
   async function deleteFact(key: string) {
-    await fetch("/api/facts/delete", {
+    await fetch(`${API_BASE}/facts/delete`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key })
     });
 
@@ -87,7 +96,6 @@ export function MemoryPanel() {
         >
           ?
         </button>
-
       </div>
 
       {/* INFO POPUP */}
@@ -191,7 +199,7 @@ export function MemoryPanel() {
           background: "#222",
           color: "white",
           fontSize: 14
-          }}
+        }}
       />
 
       <input

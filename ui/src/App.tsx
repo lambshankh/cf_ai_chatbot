@@ -18,7 +18,12 @@ function App() {
     const userMsg = { role: "user", content: text };
     setMessages(prev => [...prev, userMsg]);
 
-    const res = await fetch("/api/chat?session=default", {
+    // Correct backend endpoint
+    const API_URL = import.meta.env.DEV
+      ? "/api/chat?session=default"
+      : "https://chatbot.shankhisinha1005.workers.dev/api/chat?session=default";
+
+    const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text })
@@ -30,7 +35,6 @@ function App() {
     setMessages(prev => [...prev, botMsg]);
   }
 
-  // Auto scroll
   useEffect(() => {
     chatRef.current?.scrollTo(0, chatRef.current.scrollHeight);
   }, [messages]);
@@ -73,7 +77,6 @@ function App() {
             transition: "flex 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)"
           }}
         >
-          {/* TOP BAR */}
           <div
             style={{
               display: "flex",
@@ -85,10 +88,8 @@ function App() {
           >
             <h2 style={{ margin: 0 }}>CF AI Chatbot</h2>
 
-            {/* 3-DOT MENU BUTTON + TOOLTIP */}
             <div style={{ position: "absolute", right: 0, top: 0 }}>
               <div style={{ position: "relative" }}>
-                {/* Tooltip */}
                 <div
                   className="tooltip"
                   style={{
@@ -105,13 +106,12 @@ function App() {
                     top: "50%",
                     transform: "translateY(-50%)",
                     whiteSpace: "nowrap",
-                    pointerEvents: "none",
+                    pointerEvents: "none"
                   }}
                 >
                   User Facts Panel
                 </div>
 
-                {/* Button */}
                 <button
                   onMouseEnter={(e) => {
                     const tip = e.currentTarget.previousSibling as HTMLElement;
@@ -146,7 +146,6 @@ function App() {
             </div>
           </div>
 
-          {/* CHAT AREA */}
           <div
             ref={chatRef}
             style={{
@@ -163,7 +162,6 @@ function App() {
             ))}
           </div>
 
-          {/* INPUT + SEND */}
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <input
               value={input}
@@ -197,7 +195,6 @@ function App() {
           </div>
         </div>
 
-        {/* RIGHT: Memory Panel (only visible when open) */}
         {panelOpen && (
           <div style={{ height: "100%", display: "flex" }}>
             <MemoryPanel />

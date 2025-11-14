@@ -1,31 +1,40 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "chatbot",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-11-11",
-
-  "ai": { "binding": "AI" },
-
-  "kv_namespaces": [
-    { "binding": "CACHE", "id": "cf_ai_cache" },
-    { "binding": "MEMORY", "id": "cf_ai_memory" }
-  ],
-
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "SESSIONS",
-        "class_name": "SessionDO"
-      }
-    ]
-  },
-
-"migrations": [
-  {
-    "tag": "v1",
-    "new_classes": ["SessionDO"]
-  }
-],
-
-  "observability": { "enabled": true }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "chatbot",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-11-11",
+	"ai": {
+		"binding": "AI"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "MEMORY",
+			"id": "70bc419771044ae889f5fed5aa101b58",
+			"remote": true
+		},
+		{
+			"binding": "CACHE",
+			"id": "da67609c1fd94a9da80df48c8e1292da",
+			"remote": true
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "SESSIONS",
+				"class_name": "SessionDO"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"SessionDO"
+			]
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
 }
