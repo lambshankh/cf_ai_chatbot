@@ -40,7 +40,7 @@ export class SessionDO {
 
       if (!entry) return new Response("Missing entry", { status: 400 });
 
-      const MAX_WINDOW = 5;
+      const MAX_WINDOW = 25;
 
       const history =
         (await this.state.storage.get<
