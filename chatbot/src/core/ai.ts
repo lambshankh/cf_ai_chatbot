@@ -26,7 +26,7 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
   // Build LLM prompt
   const contextMsgs: Array<{ role: string; content: string }> = [];
 
-  // SYSTEM — natural, human tone, uses memory
+  // SYSTEM PROMPT
   contextMsgs.push({
     role: "system",
     content:
@@ -53,28 +53,20 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
         ? userFacts.map(f => `- ${f.key}: ${f.value}`).join("\n")
         : "None")
   });
-  // ------------------------------------------------------
 
-  // Provide memory to model (hidden from user)
+  // Model-learned memory
   contextMsgs.push({
     role: "assistant",
     content: `MEMORY:\n${JSON.stringify(memory)}`
   });
 
-  // Add entire conversation history
+  // Add conversation history
   for (const entry of history) {
     contextMsgs.push({ role: entry.role, content: entry.content });
   }
 
   // Add new user message
   contextMsgs.push({ role: "user", content: userMessage });
-
-  // Debug
-  console.log(">>> PROMPT START >>>");
-  contextMsgs.forEach((m, i) =>
-    console.log(`[${i}] ${m.role.toUpperCase()}: ${m.content}`)
-  );
-  console.log("<<< PROMPT END <<<");
 
   // LLM call
   const result = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
@@ -108,11 +100,6 @@ export async function handleChat(req: Request, env: Env, sessionId: string) {
   });
 }
 
-
-
-// ------------------------------------------------------
-// Memory update logic (improved)
-// ------------------------------------------------------
 async function updateMemory(env: Env, stub: DurableObjectStub) {
   const sessionData = await stub.fetch("http://session/get");
   const { memory, history } =
