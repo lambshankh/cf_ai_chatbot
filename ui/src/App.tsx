@@ -5,6 +5,7 @@ import { ChatBubble } from "./components/ChatBubble";
 function App() {
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
   const [input, setInput] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   const chatRef = useRef<HTMLDivElement>(null);
 
@@ -42,7 +43,8 @@ function App() {
         background: "#101010",
         display: "flex",
         justifyContent: "center",
-        alignItems: "center"
+        alignItems: "center",
+        overflow: "hidden"
       }}
     >
       <div
@@ -52,13 +54,14 @@ function App() {
           gap: 20,
           height: "85vh",
           width: "95%",
-          maxWidth: 1000
+          maxWidth: 1000,
+          transition: "all 0.3s ease"
         }}
       >
-        {/* LEFT: chat */}
+        {/* LEFT: Chat Box */}
         <div
           style={{
-            flex: 1,
+            flex: panelOpen ? 0.78 : 1,
             background: "#1a1a1a",
             borderRadius: 12,
             padding: 20,
@@ -66,13 +69,84 @@ function App() {
             border: "1px solid #2c2c2c",
             display: "flex",
             flexDirection: "column",
-            boxShadow: "0 0 12px rgba(0,0,0,0.35)"
+            position: "relative",
+            transition: "flex 0.35s cubic-bezier(0.25, 0.1, 0.25, 1)"
           }}
         >
-          <h2 style={{ textAlign: "center", marginBottom: 10, fontWeight: 600 }}>
-            CF AI Chatbot
-          </h2>
+          {/* TOP BAR */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              marginBottom: 10,
+              position: "relative"
+            }}
+          >
+            <h2 style={{ margin: 0 }}>CF AI Chatbot</h2>
 
+            {/* 3-DOT MENU BUTTON + TOOLTIP */}
+            <div style={{ position: "absolute", right: 0, top: 0 }}>
+              <div style={{ position: "relative" }}>
+                {/* Tooltip */}
+                <div
+                  className="tooltip"
+                  style={{
+                    visibility: "hidden",
+                    opacity: 0,
+                    transition: "opacity 0.2s",
+                    background: "#222",
+                    color: "white",
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    position: "absolute",
+                    right: "110%",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                  }}
+                >
+                  User Facts Panel
+                </div>
+
+                {/* Button */}
+                <button
+                  onMouseEnter={(e) => {
+                    const tip = e.currentTarget.previousSibling as HTMLElement;
+                    tip.style.visibility = "visible";
+                    tip.style.opacity = "1";
+                  }}
+                  onMouseLeave={(e) => {
+                    const tip = e.currentTarget.previousSibling as HTMLElement;
+                    tip.style.visibility = "hidden";
+                    tip.style.opacity = "0";
+                  }}
+                  onClick={() => setPanelOpen(!panelOpen)}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid #555",
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    color: "#ddd",
+                    cursor: "pointer",
+                    fontSize: 20,
+                    lineHeight: "26px",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    padding: 0
+                  }}
+                >
+                  ⋮
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* CHAT AREA */}
           <div
             ref={chatRef}
             style={{
@@ -89,6 +163,7 @@ function App() {
             ))}
           </div>
 
+          {/* INPUT + SEND */}
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <input
               value={input}
@@ -122,8 +197,12 @@ function App() {
           </div>
         </div>
 
-        {/* RIGHT: memory panel */}
-        <MemoryPanel />
+        {/* RIGHT: Memory Panel (only visible when open) */}
+        {panelOpen && (
+          <div style={{ height: "100%", display: "flex" }}>
+            <MemoryPanel />
+          </div>
+        )}
       </div>
     </div>
   );

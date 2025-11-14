@@ -47,12 +47,13 @@ export function MemoryPanel() {
         width: 300,
         background: "#141414",
         borderRadius: 12,
-        padding: 16,
+        padding: 20,
+        paddingBottom: 32,
         color: "white",
         border: "1px solid #2a2a2a",
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        height: "92%",
         boxShadow: "0 0 12px rgba(0,0,0,0.4)",
         position: "relative"
       }}
@@ -81,11 +82,12 @@ export function MemoryPanel() {
             color: "#ddd",
             cursor: "pointer",
             fontSize: 14,
-            lineHeight: "22px"
+            lineHeight: "6px",
           }}
         >
           ?
         </button>
+
       </div>
 
       {/* INFO POPUP */}
@@ -181,6 +183,7 @@ export function MemoryPanel() {
         placeholder="Fact name"
         style={{
           width: "100%",
+          boxSizing: "border-box",
           padding: 10,
           marginBottom: 8,
           borderRadius: 6,
@@ -188,7 +191,7 @@ export function MemoryPanel() {
           background: "#222",
           color: "white",
           fontSize: 14
-        }}
+          }}
       />
 
       <input
@@ -197,8 +200,9 @@ export function MemoryPanel() {
         placeholder="Fact value"
         style={{
           width: "100%",
+          boxSizing: "border-box",
           padding: 10,
-          marginBottom: 10,
+          marginBottom: 8,
           borderRadius: 6,
           border: "1px solid #333",
           background: "#222",
